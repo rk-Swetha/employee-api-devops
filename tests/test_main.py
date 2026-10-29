@@ -29,7 +29,7 @@ def test_create_employee():
     response = client.post(
         "/employees",
         json={
-            "name": "Swetha",
+            "name": "Swetha Ramesh Kumar",
             "role": "DevOps Engineer",
             "department": "Engineering",
         },
