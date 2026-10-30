@@ -4,6 +4,7 @@ from fastapi import Depends, FastAPI, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app import models, schemas
 from app.database import Base, engine, get_db
 
@@ -16,7 +17,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Employee Management API",
+    title=settings.APP_NAME,
     lifespan=lifespan,
 )
 
