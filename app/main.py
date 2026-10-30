@@ -1,21 +1,24 @@
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, Field
+from contextlib import asynccontextmanager
 
-app = FastAPI(title="Employee Management API")
+from fastapi import Depends, FastAPI, HTTPException, status
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
-# Data is stored in memory for this beginner project.
-employees: dict[int, dict] = {}
-next_employee_id = 1
-
-
-class EmployeeCreate(BaseModel):
-    name: str = Field(min_length=1, max_length=100)
-    role: str = Field(min_length=1, max_length=100)
-    department: str = Field(min_length=1, max_length=100)
+from app import models, schemas
+from app.database import Base, engine, get_db
 
 
-class Employee(EmployeeCreate):
-    id: int
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Create tables when the application starts.
+    Base.metadata.create_all(bind=engine)
+    yield
+
+
+app = FastAPI(
+    title="Employee Management API",
+    lifespan=lifespan,
+)
 
 
 @app.get("/")
@@ -28,41 +31,66 @@ def health_check():
     return {"status": "healthy"}
 
 
-@app.post("/employees", response_model=Employee, status_code=201)
-def create_employee(employee: EmployeeCreate):
-    global next_employee_id
+@app.post(
+    "/employees",
+    response_model=schemas.EmployeeResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_employee(
+    employee: schemas.EmployeeCreate,
+    db: Session = Depends(get_db),
+):
+    db_employee = models.Employee(**employee.model_dump())
 
-    new_employee = {
-        "id": next_employee_id,
-        **employee.model_dump(),
-    }
+    db.add(db_employee)
+    db.commit()
+    db.refresh(db_employee)
 
-    employees[next_employee_id] = new_employee
-    next_employee_id += 1
-
-    return new_employee
-
-
-@app.get("/employees", response_model=list[Employee])
-def list_employees():
-    return list(employees.values())
+    return db_employee
 
 
-@app.get("/employees/{employee_id}", response_model=Employee)
-def get_employee(employee_id: int):
-    employee = employees.get(employee_id)
+@app.get(
+    "/employees",
+    response_model=list[schemas.EmployeeResponse],
+)
+def list_employees(db: Session = Depends(get_db)):
+    statement = select(models.Employee).order_by(models.Employee.id)
+    return db.scalars(statement).all()
+
+
+@app.get(
+    "/employees/{employee_id}",
+    response_model=schemas.EmployeeResponse,
+)
+def get_employee(
+    employee_id: int,
+    db: Session = Depends(get_db),
+):
+    employee = db.get(models.Employee, employee_id)
 
     if employee is None:
-        raise HTTPException(status_code=404, detail="Employee not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Employee not found",
+        )
 
     return employee
 
 
 @app.delete("/employees/{employee_id}")
-def delete_employee(employee_id: int):
-    if employee_id not in employees:
-        raise HTTPException(status_code=404, detail="Employee not found")
+def delete_employee(
+    employee_id: int,
+    db: Session = Depends(get_db),
+):
+    employee = db.get(models.Employee, employee_id)
 
-    del employees[employee_id]
+    if employee is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Employee not found",
+        )
+
+    db.delete(employee)
+    db.commit()
 
     return {"message": "Employee deleted successfully"}
