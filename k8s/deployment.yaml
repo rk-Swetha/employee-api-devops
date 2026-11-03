@@ -12,29 +12,51 @@ spec:
       labels:
         app: employee-api
     spec:
+      imagePullSecrets:
+        - name: ghcr-secret
+
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+
       containers:
         - name: employee-api
-          image: employee-api:day11
-          imagePullPolicy: IfNotPresent
+          image: ghcr.io/rk-swetha/employee-api-devops:latest
+          imagePullPolicy: Always
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+
           ports:
             - containerPort: 8000
+
           envFrom:
             - configMapRef:
                 name: employee-api-config
             - secretRef:
                 name: employee-db-secret
+
           readinessProbe:
             httpGet:
               path: /health
               port: 8000
             initialDelaySeconds: 5
             periodSeconds: 10
+
           livenessProbe:
             httpGet:
               path: /health
               port: 8000
             initialDelaySeconds: 10
             periodSeconds: 20
+
           resources:
             requests:
               cpu: "100m"

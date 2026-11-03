@@ -1,5 +1,8 @@
+# Python virtual environments
 ./venv
 venv/
+.venv/
+
 __pycache__/
 .pytest_cache/
 *.pyc
@@ -8,3 +11,6 @@ __pycache__/
 !.env.example
 app.log
 employee.db
+
+# Trivy vulnerability scan output
+trivy-report.json
