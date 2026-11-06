@@ -48,6 +48,28 @@ pipeline {
             }
         }
 
+        stage('Publish to GHCR') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'ghcr-credentials',
+                    usernameVariable: 'GHCR_USER',
+                    passwordVariable: 'GHCR_TOKEN'
+                )]) {
+                    sh '''
+                        echo "$GHCR_TOKEN" | docker login ghcr.io \
+                            -u "$GHCR_USER" --password-stdin
+
+                        docker tag employee-api:jenkins \
+                            ghcr.io/rk-swetha/employee-api-devops:jenkins
+
+                        docker push ghcr.io/rk-swetha/employee-api-devops:jenkins
+
+                        docker logout ghcr.io
+                    '''
+                }
+            }
+        }
+
         stage('Pipeline Complete') {
             steps {
                 echo 'First Jenkins pipeline completed!'
