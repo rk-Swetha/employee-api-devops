@@ -42,6 +42,12 @@ pipeline {
             }
         }
 
+        stage('Build Docker Image'){
+            steps{
+                sh 'docker build -t employee-api:jenkins .'
+            }
+        }
+
         stage('Pipeline Complete') {
             steps {
                 echo 'First Jenkins pipeline completed!'
