@@ -42,6 +42,22 @@ pipeline {
             }
         }
 
+        stage('Verify Kubernetes Access') {
+            steps {
+                withCredentials([file(
+                    credentialsId: 'kubeconfig-credentials',
+                    variable: 'KUBECONFIG'
+                )]) {
+                    sh '''
+                        echo "Checking Kubernetes cluster access..."
+                        kubectl get nodes
+                        echo "Checking application pods..."
+                        kubectl get pods -n default
+                    '''
+                }
+            }
+        }
+
         stage('Build Docker Image'){
             steps{
                 sh 'docker build -t employee-api:jenkins .'
