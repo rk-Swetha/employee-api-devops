@@ -110,3 +110,7 @@ def test_delete_employee(client):
 
     get_response = client.get(f"/employees/{employee_id}")
     assert get_response.status_code == 404
+
+
+def test_jenkins_failure_demo():
+    assert 1 == 2
