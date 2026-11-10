@@ -1,26 +1,55 @@
 # Employee Management API
 
-A containerized Employee Management REST API built with **Python, FastAPI, SQLAlchemy, and PostgreSQL**. This project demonstrates application development, automated testing, Docker, CI/CD with GitHub Actions, and Kubernetes deployment.
+A containerized Employee Management REST API built with **Python, FastAPI, SQLAlchemy, and PostgreSQL**. This project demonstrates application development, automated testing, Docker, CI/CD automation using GitHub Actions and Jenkins, container security, and Kubernetes deployment.
 
 ## Architecture
 
+This project implements two independent CI/CD pipelines.
+
+- **GitHub Actions:** Automates testing, Kubernetes manifest validation, Docker image building, and publishing to GitHub Container Registry.
+- **Jenkins:** Uses GitHub webhooks to trigger automated testing, Docker image building, publishing to GHCR, and deployment to Kubernetes.
+
+### GitHub Actions Workflow
+
 ```mermaid
 flowchart TD
-    A[Developer pushes code to GitHub]
-    B[GitHub Actions CI]
-    C[Run Pytest]
-    D[Validate Kubernetes manifests]
-    E[Build Docker image]
-    F[Publish image to GHCR]
-    G[Kubernetes Deployment]
-    H[Employee API - FastAPI]
-    I[PostgreSQL]
-    J[Persistent Volume Claim]
+    A[Developer Push or Pull Request] --> B[GitHub Repository]
+    B --> C[GitHub Actions]
+    C --> D[Install Dependencies]
+    D --> E[Run Pytest]
+    E --> F[Validate Kubernetes Manifests]
+    F --> G[Build Docker Image]
+    G --> H[Publish Image to GHCR]
+```
 
-    A --> B --> C --> D --> E --> F
-    F --> G --> H
-    H --> I
-    I --> J
+### Jenkins Workflow
+
+```mermaid
+flowchart TD
+    A[Developer Push] --> B[GitHub Repository]
+    B --> C[GitHub Webhook]
+    C --> D[Jenkins Pipeline]
+    D --> E[Checkout Source Code]
+    E --> F[Verify Environment]
+    F --> G[Install Dependencies]
+    G --> H[Run Pytest]
+    H --> I[Verify Kubernetes Access]
+    I --> J[Build Docker Image]
+    J --> K[Publish Image to GHCR]
+    K --> L[Deploy to Kubernetes]
+    L --> M[Verify Deployment Rollout]
+```
+
+### Application Deployment Architecture
+
+```mermaid
+flowchart TD
+    A[Docker Desktop Kubernetes]
+    A --> B[Employee API Deployment]
+    B --> C[FastAPI Application]
+    C --> D[PostgreSQL Service]
+    D --> E[PostgreSQL Deployment]
+    E --> F[Persistent Volume Claim]
 ```
 
 ## Technology Stack
@@ -28,31 +57,36 @@ flowchart TD
 | Component | Technology |
 |---|---|
 | Language | Python 3.13 |
-| API framework | FastAPI |
+| API Framework | FastAPI |
 | ORM | SQLAlchemy |
-| Database | PostgreSQL 16 / SQLite |
+| Database | PostgreSQL 16 / SQLite for tests |
 | Testing | Pytest |
 | Containerization | Docker |
-| Local orchestration | Docker Compose |
-| CI/CD | GitHub Actions |
-| Container registry | GitHub Container Registry (GHCR) |
-| Container security | Trivy |
+| Local Orchestration | Docker Compose |
+| CI/CD | GitHub Actions, Jenkins |
+| Automation Trigger | GitHub Webhooks |
+| Container Registry | GitHub Container Registry (GHCR) |
+| Container Security | Trivy |
 | Orchestration | Kubernetes |
-| Manifest validation | Kubeconform |
+| Manifest Validation | Kubeconform |
+| Container Build | Docker Buildx, Docker CLI |
 
 ## Project Structure
 
 ```text
 employee-api-devops/
+│
 ├── .github/
 │   └── workflows/
 │       └── ci.yml
+│
 ├── app/
 │   ├── config.py
 │   ├── database.py
 │   ├── main.py
 │   ├── models.py
 │   └── schemas.py
+│
 ├── k8s/
 │   ├── configmap.yaml
 │   ├── database.yaml
@@ -61,12 +95,17 @@ employee-api-devops/
 │   ├── service.yaml
 │   ├── setup-ghcr-secret.ps1
 │   └── README.md
+│
 ├── tests/
+|   └── test_main.py
+│
 ├── .dockerignore
 ├── .env.example
 ├── .gitignore
 ├── compose.yaml
 ├── Dockerfile
+├── Dockerfile.jenkins
+├── Jenkinsfile
 └── requirements.txt
 ```
 
@@ -93,8 +132,9 @@ Interactive API documentation is available at `/docs` when the application is ru
 
 ### 1. Clone the repository
 
-```bash
+```powershell
 git clone https://github.com/rk-Swetha/employee-api-devops.git
+
 cd employee-api-devops
 ```
 
@@ -148,7 +188,9 @@ Create and activate a Python virtual environment, then install dependencies:
 
 ```powershell
 python -m venv .venv
+
 .\.venv\Scripts\Activate.ps1
+
 python -m pip install -r requirements.txt
 ```
 
@@ -158,11 +200,13 @@ Run the test suite:
 python -m pytest -v
 ```
 
-## CI/CD Pipeline
+The application test suite contains six tests covering the API endpoints and employee operations.
+
+## CI/CD with GitHub Actions
 
 GitHub Actions runs the workflow defined in `.github/workflows/ci.yml` on pushes and pull requests targeting `main`.
 
-The pipeline performs these steps:
+The pipeline performs the following steps:
 
 1. Checks out the repository.
 2. Sets up Python 3.13 and installs dependencies.
@@ -178,6 +222,65 @@ ghcr.io/rk-swetha/employee-api-devops:latest
 ```
 
 The workflow also generates commit-based image tags.
+
+The pipeline prevents subsequent build and publishing steps when the required checks fail.
+
+## CI/CD with Jenkins
+
+In addition to GitHub Actions, this project includes a Jenkins-based CI/CD pipeline that automates application testing, Docker image creation, publishing, and Kubernetes deployment.
+
+### Pipeline Trigger
+
+- Configured a GitHub webhook to notify Jenkins when code is pushed to the repository.
+- Enabled the GitHub hook trigger in the Jenkins pipeline job.
+- Verified automatic Jenkins pipeline execution following a GitHub push.
+
+### Jenkins Pipeline Stages
+
+| Stage | Description |
+|---|---|
+| Checkout | Retrieves source code from GitHub |
+| Verify Environment | Checks the Jenkins build environment |
+| Install Dependencies | Creates a Python virtual environment and installs dependencies |
+| Run Pytest | Executes automated application tests |
+| Verify Kubernetes Access | Uses Jenkins credentials to authenticate and check Kubernetes nodes and pods |
+| Build Docker Image | Builds the application container image |
+| Publish to GHCR | Authenticates and pushes the image to GitHub Container Registry |
+| Deploy to Kubernetes | Updates the existing Kubernetes Deployment with the newly published image |
+| Pipeline Complete | Confirms successful pipeline execution |
+
+### Jenkins Automation
+
+- Configured GitHub webhooks for automatic pipeline triggers.
+- Integrated Jenkins with Docker using Docker CLI and Docker socket access.
+- Configured GitHub Container Registry credentials through Jenkins Credentials.
+- Configured Kubernetes access using Jenkins Secret File credentials.
+- Automated Kubernetes deployments using `kubectl`.
+- Added rollout verification to confirm successful deployments.
+- Tested pipeline failure handling: failed tests prevent Docker image building and publishing.
+
+### Container Image
+
+The Jenkins pipeline publishes:
+
+```text
+ghcr.io/rk-swetha/employee-api-devops:jenkins
+```
+
+### Deployment Environment
+
+| Component | Environment |
+|---|---|
+| Jenkins | Local Docker container |
+| Kubernetes | Docker Desktop Kubernetes |
+| Container Registry | GitHub Container Registry |
+| Application Namespace | default |
+
+**Note:** Jenkins and Kubernetes were configured in a local development environment for hands-on CI/CD practice. This is not a production cloud deployment.
+
+**Security consideration:** The Jenkins lab uses Docker socket access to communicate with the host Docker daemon. Docker socket access provides highly privileged control over the Docker host and should not be treated as a production-secure configuration.
+
+The GitHub webhook uses a temporary Cloudflare Quick Tunnel for local testing. The tunnel URL changes when a new tunnel is started, so the GitHub webhook URL must be updated accordingly.
 
 ## Kubernetes Deployment
 
@@ -206,13 +309,15 @@ Ensure the following prerequisites exist first:
 - `employee-db-secret` containing the database credentials and `DATABASE_URL`.
 - `ghcr-secret` for pulling the private GHCR image.
 
-Follow [`k8s/README.md`](k8s/README.md) to configure GHCR authentication.
+Follow [`k8s/README.md`](k8s/README.md) for the required configuration.
 
 Apply the configuration and database resources:
 
 ```powershell
 kubectl apply -f .\k8s\configmap.yaml
+
 kubectl apply -f .\k8s\postgres-pvc.yaml
+
 kubectl apply -f .\k8s\database.yaml
 ```
 
@@ -226,6 +331,7 @@ Then deploy the API and its Service:
 
 ```powershell
 kubectl apply -f .\k8s\deployment.yaml
+
 kubectl apply -f .\k8s\service.yaml
 ```
 
@@ -239,8 +345,11 @@ kubectl rollout status deployment/employee-api --timeout=180s
 
 ```powershell
 kubectl get pods
+
 kubectl get deployments
+
 kubectl get services
+
 kubectl get pvc
 ```
 
@@ -252,39 +361,17 @@ Port-forward the API Deployment:
 kubectl port-forward deployment/employee-api 8001:8000
 ```
 
-In another terminal:
-
-```powershell
-Invoke-RestMethod http://localhost:8001/health
-```
-
-Open API documentation at http://localhost:8001/docs.
-
-The API Service is also exposed as a NodePort on port `30080`, depending on the Kubernetes environment.
-
-
-### 3. Check deployment status
-
-```powershell
-kubectl get pods
-kubectl get deployments
-kubectl get services
-kubectl get pvc
-```
-
-### 4. Access the API
-
-```powershell
-kubectl port-forward deployment/employee-api 8001:8000
-```
-
 In another terminal, verify:
 
 ```powershell
 Invoke-RestMethod http://localhost:8001/health
 ```
 
-Open API documentation at http://localhost:8001/docs.
+Open API documentation at:
+
+http://localhost:8001/docs
+
+The API Service is also exposed through NodePort `30080` in the local Docker Desktop Kubernetes environment.
 
 ### 5. View application logs
 
@@ -296,6 +383,7 @@ kubectl logs deployment/employee-api --tail=50
 
 ```powershell
 kubectl rollout status deployment/employee-api
+
 kubectl rollout history deployment/employee-api
 ```
 
@@ -326,15 +414,22 @@ The application image includes several hardening measures:
 | `ImagePullBackOff` | Verify GHCR package access and `ghcr-secret` |
 | PVC not bound | Inspect PVC and storage events |
 | Pod readiness failure | Inspect readiness probe and pod logs |
-| CI pipeline failure | Review the failed GitHub Actions step |
+| GitHub Actions failure | Review the failed workflow step |
+| Jenkins pipeline failure | Review the failed Jenkins stage and build console output |
+| Jenkins Kubernetes deployment failure | Check kubeconfig credentials, Kubernetes connectivity, and rollout status |
+| Jenkins webhook not triggering | Verify the webhook URL, delivery response, and Jenkins trigger configuration |
 
 Useful commands:
 
 ```powershell
 kubectl get pods
+
 kubectl get events --sort-by=.metadata.creationTimestamp
+
 kubectl describe pod <pod-name>
+
 kubectl logs <pod-name>
+
 kubectl get endpoints employee-db
 ```
 
@@ -347,9 +442,13 @@ This project demonstrates practical experience with:
 - Containerizing applications with Docker.
 - Managing local multi-container environments with Docker Compose.
 - Automating testing and image publishing using GitHub Actions.
+- Building CI/CD pipelines using Jenkins.
+- Configuring GitHub webhook-based automated triggers.
+- Integrating Jenkins with Docker, GHCR, and Kubernetes.
 - Publishing and pulling private images through GHCR.
 - Deploying and operating applications on Kubernetes.
 - Managing Kubernetes configuration, Secrets, and persistent storage.
+- Automating deployments and rollout verification.
 - Troubleshooting application and infrastructure issues.
 - Scanning and hardening container images.
 
@@ -358,5 +457,3 @@ This project demonstrates practical experience with:
 **Swetha R.K.**
 
 GitHub: [rk-Swetha](https://github.com/rk-Swetha)
-
-Webhook auto-trigger test
