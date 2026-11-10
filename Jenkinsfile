@@ -86,6 +86,26 @@ pipeline {
             }
         }
 
+        stage('Deploy to Kubernetes') {
+            steps {
+                withCredentials([file(
+                    credentialsId: 'kubeconfig-credentials',
+                    variable: 'KUBECONFIG'
+                )]) {
+                    sh '''
+                        kubectl set image deployment/employee-api \
+                            employee-api=ghcr.io/rk-swetha/employee-api-devops:jenkins \
+                            -n default
+
+                        kubectl rollout status deployment/employee-api \
+                            -n default --timeout=120s
+
+                        kubectl get pods -n default
+                    '''
+                }
+            }
+        }
+
         stage('Pipeline Complete') {
             steps {
                 echo 'First Jenkins pipeline completed!'
